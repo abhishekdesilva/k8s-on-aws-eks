@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: obiam-deployment
+  labels:
+    app: obiam
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: obiam
+  template:
+    metadata:
+      labels:
+        app: obiam
+    spec:
+      containers:
+      - name: wso2-obiam
+        image: docker.wso2.com/wso2-obiam:3.0.0.44
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9446
+        volumeMounts:
+          - name: deployment-toml
+            mountPath: /home/wso2carbon/wso2is-5.11.0/repository/conf/deployment.toml
+            subPath: deployment.toml
+          - name: ob-km-resources-security
+            mountPath: /home/wso2carbon/wso2is-5.11.0/repository/resources/security
+        env:
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MYSQL_ROOT_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-user
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: mysql-root-password
+      imagePullSecrets:
+        - name: registry-secret
+      volumes:
+        - name: deployment-toml
+          configMap:
+            name: dep-toml-config
+        - name: ob-km-resources-security
+          configMap:
+            name: obiam-security-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: obiam-service
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9446
+  type: NodePort
+  selector:
+    app: obiam
